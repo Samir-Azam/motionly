@@ -1,0 +1,1 @@
+export const mongoDB_name = 'motionly'
