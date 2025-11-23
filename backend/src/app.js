@@ -60,8 +60,10 @@ app.use(cookieParser())
 // use for serving static files
 app.use(express.static("public"))
 
-
+// import routes
 import healthcheckRoutes from "./routes/healthcheck.routes.js"
-app.use("/api/v1", healthcheckRoutes)
+
+// routes
+app.use("/api/v1/healthcheck", healthcheckRoutes)
 
 export {app}
