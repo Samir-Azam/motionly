@@ -1,13 +1,11 @@
-import express from 'express'
-import cors from 'cors'
+import express from 'express';
+import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import logger from './config/logger.js';
-import 'dotenv/config'
+import 'dotenv/config';
 
-
-const app = express()
-
+const app = express();
 
 if (process.env.NODE_ENV !== 'production') {
   morgan.token('winlog', (req, res) => {
@@ -44,26 +42,24 @@ app.use(
     origin: process.env.CORS_ORIGIN || '*',
     credentials: true
   })
-); 
-
-
+);
 
 // this middleware will parse the json data from the frontend and attach it to req.body
-app.use(express.json({limit:"16kb"}))
+app.use(express.json({ limit: '16kb' }));
 
 // this middleware will parse html form data from the frontend and attach it to req.body. extended: true for nested objects
-app.use(express.urlencoded({extended:true, limit:"16kb"}))
+app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 
 // use for handling cookies
-app.use(cookieParser())
+app.use(cookieParser());
 
 // use for serving static files
-app.use(express.static("public"))
+app.use(express.static('public'));
 
 // import routes
-import healthcheckRoutes from "./routes/healthcheck.routes.js"
+import healthcheckRoutes from './routes/healthcheck.routes.js';
 
 // routes
-app.use("/api/v1/healthcheck", healthcheckRoutes)
+app.use('/api/v1/healthcheck', healthcheckRoutes);
 
-export {app}
+export { app };
