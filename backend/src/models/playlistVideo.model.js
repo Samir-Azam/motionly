@@ -1,4 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
+import aggregatePaginate from 'mongoose-aggregate-paginate-v2';
+
 
 const playlistVideoSchema = new Schema(
   {
@@ -24,6 +26,8 @@ const playlistVideoSchema = new Schema(
 
 // Prevent duplicate video entries inside the same playlist
 playlistVideoSchema.index({ playlist: 1, video: 1 }, { unique: true });
+
+playlistVideoSchema.plugin(aggregatePaginate);
 
 export const PlaylistVideo = mongoose.model(
   'PlaylistVideo',

@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import 'dotenv/config';
-import fs from 'fs';
+import fs from 'fs/promises';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -17,12 +17,35 @@ export const uploadOnCloudinary = async (localFilePath) => {
     });
 
     // Remove file from server
-    fs.unlinkSync(localFilePath);
+    await fs.unlink(localFilePath);
 
     return response;
   } catch (error) {
-    fs.unlinkSync(localFilePath); // Remove even on failure
+    // Cleanup if something fails
+    try {
+      await fs.unlink(localFilePath);
+    } catch (_) {}
     return null;
   }
 };
+
+
+export const deleteFromCloudinary = async (
+  publicId,
+  resourceType = 'image'
+) => {
+  try {
+    if (!publicId) return null;
+
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType
+    });
+
+    return result;
+  } catch (error) {
+    console.log('Cloudinary delete error:', error.message);
+    return null;
+  }
+};
+
 
