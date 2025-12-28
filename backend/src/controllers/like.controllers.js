@@ -2,45 +2,59 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { Like } from '../models/like.model.js';
+import { Video } from '../models/video.model.js';
+import { Comment } from '../models/comment.model.js';
 import { toObjectId } from '../utils/helper.js';
 
 export const toggleLike = asyncHandler(async (req, res) => {
-  const { targetId, targetType } = req.body;
+  const { targetType, targetId } = req.body;
+  const userId = req.user?._id;
 
-  if (!targetId || !targetType) {
-    throw new ApiError(400, 'targetId and targetType are required');
-  }
+  if (!targetId) throw new ApiError(400, 'Target id is required');
+  if (!targetType) throw new ApiError(400, 'Target type is required');
+  if (!userId) throw new ApiError(401, 'Not logged in');
 
-  if (!['video', 'comment', 'tweet'].includes(targetType)) {
+  // Validate targetType
+  const validTypes = ['video', 'comment', 'tweet'];
+  if (!validTypes.includes(targetType)) {
     throw new ApiError(400, 'Invalid target type');
   }
 
-  const userId = req.user?._id;
-
+  // Check if like already exists
   const existingLike = await Like.findOne({
-    likedBy: userId,
-    targetId,
-    targetType
+    targetId: toObjectId(targetId),
+    targetType,
+    likedBy: userId
   });
 
-  // If like exists → UNLIKE
+  let message;
+  let isLiked;
+
   if (existingLike) {
+    // Unlike: Remove like
     await Like.findByIdAndDelete(existingLike._id);
-    return res
-      .status(200)
-      .json(new ApiResponse(200, { liked: false }, 'Unliked successfully'));
+    message = `${targetType} unliked successfully`;
+    isLiked = false;
+  } else {
+    // Like: Create new like
+    await Like.create({
+      targetId: toObjectId(targetId),
+      targetType,
+      likedBy: userId
+    });
+    message = `${targetType} liked successfully`;
+    isLiked = true;
   }
 
-  // If not exists → LIKE
-  await Like.create({
-    likedBy: userId,
-    targetId,
+  // Get updated like count
+  const likeCount = await Like.countDocuments({
+    targetId: toObjectId(targetId),
     targetType
   });
 
   return res
-    .status(201)
-    .json(new ApiResponse(201, { liked: true }, 'Liked successfully'));
+    .status(200)
+    .json(new ApiResponse(200, { isLiked, likeCount }, message));
 });
 
 export const getLikeCount = asyncHandler(async (req, res) => {
@@ -57,12 +71,11 @@ export const getLikeCount = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { count }, 'Like count fetched'));
+    .json(new ApiResponse(200, { likeCount: count }, 'Like count fetched'));
 });
 
 export const isLikedByUser = asyncHandler(async (req, res) => {
   const { targetId, targetType } = req.params;
-
   const userId = req.user._id;
 
   const existing = await Like.exists({
@@ -73,5 +86,7 @@ export const isLikedByUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { liked: Boolean(existing) }, 'Status fetched'));
+    .json(
+      new ApiResponse(200, { isLiked: Boolean(existing) }, 'Status fetched')
+    );
 });

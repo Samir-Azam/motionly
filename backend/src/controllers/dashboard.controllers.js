@@ -1,71 +1,69 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
-import { ApiError } from '../utils/ApiError.js';
 import { Video } from '../models/video.model.js';
 import { Subscription } from '../models/subscription.model.js';
 import { Like } from '../models/like.model.js';
 import { Playlist } from '../models/playlist.model.js';
 import { Comment } from '../models/comment.model.js';
-import { WatchHistory } from '../models/watchHistory.model.js';
 
+// dashboard.controllers.js
 export const getDashboardStats = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
-  // 1. Fetch total videos uploaded
+  // Get total videos
   const totalVideos = await Video.countDocuments({ owner: userId });
 
-  // 2. Total subscribers (people who follow this channel)
+  // Get total subscribers (people who subscribed to this user's channel)
   const totalSubscribers = await Subscription.countDocuments({
     channel: userId
   });
 
-  // 3. Total channels user is subscribed to
-  const subscribedTo = await Subscription.countDocuments({
-    subscriber: userId
+  // Get total likes on user's videos (FIXED)
+  const videos = await Video.find({ owner: userId }).select('_id');
+  const videoIds = videos.map((v) => v._id);
+
+  const totalLikes = await Like.countDocuments({
+    targetId: { $in: videoIds },
+    targetType: 'video'
   });
 
-  // 4. Total likes received across ALL videos + tweets + comments
-  const totalLikesReceived = await Like.countDocuments({
-    targetType: 'video',
-    targetId: { $in: await Video.find({ owner: userId }).distinct('_id') }
-  });
-
-  // 5. Playlist count
+  // Get total playlists
   const totalPlaylists = await Playlist.countDocuments({ owner: userId });
 
-  // 6. Recent uploads (last 5 videos)
+  // Get total views
+  const viewsResult = await Video.aggregate([
+    { $match: { owner: userId } },
+    { $group: { _id: null, totalViews: { $sum: '$views' } } }
+  ]);
+  const totalViews = viewsResult[0]?.totalViews || 0;
+
+  // Get recent uploads (last 10 videos)
   const recentUploads = await Video.find({ owner: userId })
     .sort({ createdAt: -1 })
-    .limit(5);
+    .limit(10)
+    .populate('owner', 'username fullName avatar');
 
-  // 7. Recent comments by user
-  const recentComments = await Comment.find({ owner: userId })
+  // Get recent comments on user's videos
+  const recentComments = await Comment.find({
+    video: { $in: videoIds }
+  })
     .sort({ createdAt: -1 })
-    .limit(5)
-    .populate('video', 'title thumbnail');
+    .limit(10)
+    .populate('owner', 'username fullName avatar')
+    .populate('video', 'title');
 
-  // 8. Recent watch history (last 5 watched videos)
-  const recentWatched = await WatchHistory.find({ user: userId })
-    .sort({ watchedAt: -1 })
-    .limit(5)
-    .populate('video', 'title thumbnail duration');
-
+  // ✅ Return in ApiResponse format
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        totals: {
-          videos: totalVideos,
-          subscribers: totalSubscribers,
-          subscribedTo,
-          likesReceived: totalLikesReceived,
-          playlists: totalPlaylists
-        },
-        recent: {
-          uploads: recentUploads,
-          comments: recentComments,
-          watched: recentWatched
-        }
+        totalVideos,
+        totalSubscribers,
+        totalLikes,
+        totalPlaylists,
+        totalViews,
+        recentUploads,
+        recentComments
       },
       'Dashboard stats fetched successfully'
     )

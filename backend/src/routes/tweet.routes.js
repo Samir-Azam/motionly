@@ -3,6 +3,7 @@ import { verifyJWT } from "../middlewares/auth.middlewares.js";
 import {
   createTweet,
   getFeedTweets,
+  getPersonalizedFeed, // ✅ Add this
   getTweetsByUsername,
   deleteTweet,
   toggleTweetLike
@@ -10,9 +11,13 @@ import {
 
 const router = Router();
 
+// Public/semi-public routes
+router.get("/feed", getFeedTweets); // ✅ All tweets (no auth required)
+router.get("/following", verifyJWT, getPersonalizedFeed); // ✅ Only subscribed channels
+
+// Other routes
 router.post("/", verifyJWT, createTweet);
-router.get("/feed", verifyJWT, getFeedTweets);
-router.get("/user/:username", verifyJWT, getTweetsByUsername);
+router.get("/user/:username", getTweetsByUsername);
 router.delete("/:id", verifyJWT, deleteTweet);
 router.post("/:id/like", verifyJWT, toggleTweetLike);
 

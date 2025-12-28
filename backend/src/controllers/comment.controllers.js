@@ -15,12 +15,18 @@ export const addComment = asyncHandler(async (req, res) => {
     video: toObjectId(videoId),
     owner: req.user._id,
     content,
-    parentComment: parentComment || null
+    parentComment: parentComment ? toObjectId(parentComment) : null
   });
+
+  // ✅ Populate owner before returning
+  const populatedComment = await Comment.findById(comment._id).populate(
+    'owner',
+    'username fullName avatar'
+  );
 
   return res
     .status(201)
-    .json(new ApiResponse(201, comment, 'Comment added successfully'));
+    .json(new ApiResponse(201, populatedComment, 'Comment added successfully'));
 });
 
 export const getCommentsForVideo = asyncHandler(async (req, res) => {
@@ -53,6 +59,25 @@ export const getCommentsForVideo = asyncHandler(async (req, res) => {
       }
     },
     { $unwind: '$owner' },
+    // ✅ Added: Count replies for each comment
+    {
+      $lookup: {
+        from: 'comments',
+        localField: '_id',
+        foreignField: 'parentComment',
+        as: 'replies'
+      }
+    },
+    {
+      $addFields: {
+        replyCount: { $size: '$replies' }
+      }
+    },
+    {
+      $project: {
+        replies: 0 // Don't send the actual replies, just the count
+      }
+    },
     { $sort: { createdAt: -1 } }
   ]);
 
@@ -107,10 +132,11 @@ export const deleteComment = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Not authorized to delete this comment');
   }
 
-  await Comment.findByIdAndDelete(id);
-
-  // optionally delete replies also
+  // Delete all nested replies first
   await Comment.deleteMany({ parentComment: id });
+
+  // Delete the comment
+  await Comment.findByIdAndDelete(id);
 
   return res
     .status(200)
@@ -136,6 +162,13 @@ export const updateComment = asyncHandler(async (req, res) => {
   comment.content = content;
   await comment.save();
 
-  return res.status(200).json(new ApiResponse(200, comment, 'Comment updated'));
-});
+  // ✅ Populate owner before returning
+  const updatedComment = await Comment.findById(id).populate(
+    'owner',
+    'username fullName avatar'
+  );
 
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedComment, 'Comment updated'));
+});

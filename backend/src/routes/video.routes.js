@@ -17,7 +17,7 @@ router.get('/', (_, res) => {
   res.send('Video routes working');
 });
 
-
+// ✅ UPLOAD - Keep at top
 router.post(
   '/upload',
   verifyJWT,
@@ -29,12 +29,10 @@ router.post(
   uploadVideo
 );
 
-router.get('/:id', getVideoById);
+router.get('/feed/all', getAllVideos);              
+router.get('/user/:username', getVideoByUsername);  
 
-router.get('/feed/all', getAllVideos);
-
-router.get('/user/:username', getVideoByUsername);
-
+// ✅ UPDATE/DELETE - Specific paths
 router.patch(
   '/update/:id',
   verifyJWT,
@@ -44,5 +42,7 @@ router.patch(
 );
 
 router.delete('/delete/:id', verifyJWT, deleteVideo);
+
+router.get('/:id', getVideoById);  
 
 export default router;

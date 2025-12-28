@@ -24,22 +24,31 @@ export const toggleSubscription = asyncHandler(async (req, res) => {
     channel: channelId
   });
 
+  let isSubscribed;
+
   if (existing) {
+    // Unsubscribe
     await Subscription.findByIdAndDelete(existing._id);
+    isSubscribed = false;
+
     return res
       .status(200)
-      .json(new ApiResponse(200, {}, 'Unsubscribed successfully'));
+      .json(
+        new ApiResponse(200, { isSubscribed }, 'Unsubscribed successfully')
+      );
   }
 
   // Create new subscription
-  const newSub = await Subscription.create({
+  await Subscription.create({
     subscriber: req.user._id,
     channel: channelId
   });
 
+  isSubscribed = true;
+
   return res
     .status(200)
-    .json(new ApiResponse(200, newSub, 'Subscribed successfully'));
+    .json(new ApiResponse(200, { isSubscribed }, 'Subscribed successfully'));
 });
 
 export const getSubscribers = asyncHandler(async (req, res) => {
@@ -85,10 +94,10 @@ export const getSubscribedChannels = asyncHandler(async (req, res) => {
     },
     {
       $lookup: {
-        from: "users",
-        localField: "channel",
-        foreignField: "_id",
-        as: "channel",
+        from: 'users',
+        localField: 'channel',
+        foreignField: '_id',
+        as: 'channel',
         pipeline: [
           {
             $project: {
@@ -100,12 +109,12 @@ export const getSubscribedChannels = asyncHandler(async (req, res) => {
         ]
       }
     },
-    { $unwind: "$channel" }
+    { $unwind: '$channel' }
   ]);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, channels, "Subscribed channels fetched"));
+    .json(new ApiResponse(200, channels, 'Subscribed channels fetched'));
 });
 
 export const isSubscribed = asyncHandler(async (req, res) => {
@@ -118,5 +127,5 @@ export const isSubscribed = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { subscribed: !!exists }, 'Status fetched'));
+    .json(new ApiResponse(200, { isSubscribed: !!exists }, 'Status fetched'));
 });

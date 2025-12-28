@@ -28,47 +28,130 @@ export const createTweet = asyncHandler(async (req, res) => {
 });
 
 
+// Get ALL tweets (public feed for "All Tweets" tab)
 export const getFeedTweets = asyncHandler(async (req, res) => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 20;
+  const skip = (page - 1) * limit;
+
+  // Get all tweets from everyone
+  const tweets = await Tweet.find()
+    .populate('owner', 'username fullName avatar')
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .skip(skip);
+
+  const total = await Tweet.countDocuments();
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      docs: tweets,
+      page,
+      limit,
+      totalDocs: total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPrevPage: page > 1
+    }, 'All tweets fetched successfully')
+  );
+});
+
+// Get personalized feed (only subscribed channels)
+// tweet.controllers.js
+export const getPersonalizedFeed = asyncHandler(async (req, res) => {
   const userId = req.user._id;
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 20;
+  const skip = (page - 1) * limit;
 
   // Get IDs of channels the user subscribes to
-  const subscriptions = await Subscription.find({ subscriber: userId }).select(
-    'channel'
-  );
-
+  const subscriptions = await Subscription.find({ subscriber: userId }).select('channel');
   const channelIds = subscriptions.map((s) => s.channel);
 
-  // Include user's own tweets
-  channelIds.push(userId);
+  // ✅ Don't include user's own tweets - only subscribed channels
+  // Remove this line: channelIds.push(userId);
+
+  // If no subscriptions, return empty
+  if (channelIds.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, {
+        docs: [],
+        page,
+        limit,
+        totalDocs: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
+      }, 'No subscriptions yet')
+    );
+  }
 
   const tweets = await Tweet.find({
     owner: { $in: channelIds }
   })
+    .populate('owner', 'username fullName avatar')
     .sort({ createdAt: -1 })
-    .limit(20)
-    .populate('owner', 'username fullName avatar');
+    .limit(limit)
+    .skip(skip);
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, tweets, 'Feed tweets fetched'));
+  const total = await Tweet.countDocuments({ owner: { $in: channelIds } });
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      docs: tweets,
+      page,
+      limit,
+      totalDocs: total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPrevPage: page > 1
+    }, 'Following feed fetched successfully')
+  );
 });
 
 
 export const getTweetsByUsername = asyncHandler(async (req, res) => {
   const { username } = req.params;
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 20;
+  const skip = (page - 1) * limit;
 
-  const user = await User.findOne({ username });
+  if (!username) {
+    throw new ApiError(400, 'Username is required');
+  }
 
-  if (!user) throw new ApiError(404, "User not found");
+  const user = await User.findOne({ username: username.toLowerCase() });
+
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
 
   const tweets = await Tweet.find({ owner: user._id })
     .sort({ createdAt: -1 })
-    .populate("owner", "username fullName avatar");
+    .limit(limit)
+    .skip(skip)
+    .populate('owner', 'username fullName avatar');
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, tweets, "Tweets fetched successfully"));
+  const total = await Tweet.countDocuments({ owner: user._id });
+
+  // ✅ Return in SAME format as getTweetFeed and getPersonalizedFeed
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        docs: tweets, // ✅ Must be 'docs'
+        page,
+        limit,
+        totalDocs: total,
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPrevPage: page > 1
+      },
+      'User tweets fetched successfully'
+    )
+  );
 });
+
 
 export const deleteTweet = asyncHandler(async (req, res) => {
   const { id } = req.params;

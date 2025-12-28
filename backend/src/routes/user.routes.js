@@ -9,6 +9,7 @@ import {
   updateAvatar,
   updateCoverImage
 } from '../controllers/user.controllers.js';
+import { optionalAuth } from '../middlewares/optionalAuth.middlewares.js';
 import { upload } from '../middlewares/multer.middlewares.js';
 import { cleanupFiles } from '../middlewares/cleanup.middlewares.js';
 
@@ -19,7 +20,6 @@ router.route('/').get((_, res) => {
 });
 
 // Protected routes
-
 router.route('/me').get(verifyJWT, getCurrentUser);
 router.route('/reset-password').post(verifyJWT, resetPassword);
 router
@@ -36,6 +36,7 @@ router
 router.route('/update-account').patch(verifyJWT, updateAccountDetails);
 router.route('/delete-account').delete(verifyJWT, deleteUser);
 
-// Public route
-router.route('/profile/:username').get(getUserChannelProfile);
+// Public route with optional auth
+router.route('/profile/:username').get(optionalAuth, getUserChannelProfile);
+
 export default router;

@@ -28,10 +28,27 @@ export const getMyPlaylists = asyncHandler(async (req, res) => {
     createdAt: -1
   });
 
+  // Populate videos for each playlist
+  const playlistsWithVideos = await Promise.all(
+    playlists.map(async (playlist) => {
+      const videos = await PlaylistVideo.find({ 
+        playlist: playlist._id 
+      }).populate('video', 'title thumbnail duration _id');
+
+      return {
+        ...playlist.toObject(),
+        videos: videos
+      };
+    })
+  );
+
   return res
     .status(200)
-    .json(new ApiResponse(200, playlists, 'Playlists fetched successfully'));
+    .json(
+      new ApiResponse(200, playlistsWithVideos, 'Playlists fetched successfully')
+    );
 });
+
 
 export const getPlaylistById = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
@@ -54,16 +71,42 @@ export const getPlaylistById = asyncHandler(async (req, res) => {
         as: 'video',
         pipeline: [
           {
+            $lookup: {
+              from: 'users',
+              localField: 'owner',
+              foreignField: '_id',
+              as: 'owner',
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                    fullName: 1,
+                    avatar: 1
+                  }
+                }
+              ]
+            }
+          },
+          {
+            $unwind: '$owner'
+          },
+          {
             $project: {
               title: 1,
               thumbnail: 1,
-              duration: 1
+              duration: 1,
+              views: 1,
+              owner: 1,
+              createdAt: 1
             }
           }
         ]
       }
     },
-    { $unwind: '$video' }
+    { $unwind: '$video' },
+    {
+      $sort: { addedAt: -1 }
+    }
   ]);
 
   return res.status(200).json(
@@ -77,6 +120,7 @@ export const getPlaylistById = asyncHandler(async (req, res) => {
     )
   );
 });
+
 
 export const addVideoToPlaylist = asyncHandler(async (req, res) => {
   const { playlistId, videoId } = req.body;
