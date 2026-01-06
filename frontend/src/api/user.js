@@ -30,7 +30,7 @@ export const userAPI = {
   },
 
   resetPassword: async (data) => {
-    const response = await api.patch("/users/reset-password", data);
+    const response = await api.post("/users/reset-password", data);
     return response;
   },
 

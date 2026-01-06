@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    email: "",
+    identifier: "", // Changed from "email" to "identifier"
     password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -22,10 +22,23 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      await login(formData);
+      // ✅ Determine if input is email or username
+      const identifier = formData.identifier.trim().toLowerCase();
+      const isEmail = identifier.includes("@");
+
+      // ✅ Build payload based on input type
+      const payload = {
+        password: formData.password,
+        // Send either email OR username based on what user entered
+        ...(isEmail ? { email: identifier } : { username: identifier }),
+      };
+
+      await login(payload);
+      toast.success("Login successful!");
       navigate("/");
     } catch (error) {
       console.error("Login error:", error);
+      toast.error(error.response?.data?.message || "Login failed");
     } finally {
       setIsLoading(false);
     }
@@ -49,8 +62,8 @@ const Login = () => {
                 <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  name="email"
-                  value={formData.email}
+                  name="identifier" // ✅ Changed from "email" to "identifier"
+                  value={formData.identifier}
                   onChange={handleChange}
                   className="input-field pl-10"
                   placeholder="Enter email or username"
