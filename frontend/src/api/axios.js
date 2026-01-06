@@ -12,6 +12,21 @@ const api = axios.create({
   },
 });
 
+// Track if we're already refreshing to prevent multiple refresh attempts
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -30,9 +45,34 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If error is 401 and we haven't retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Don't handle 401 for auth endpoints
+    const isAuthEndpoint =
+      originalRequest.url?.includes("/auth/login") ||
+      originalRequest.url?.includes("/auth/register") ||
+      originalRequest.url?.includes("/auth/refresh-token") ||
+      originalRequest.url?.includes("/auth/current-user");
+
+    // If error is 401 and NOT an auth endpoint
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint
+    ) {
+      if (isRefreshing) {
+        // If already refreshing, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => {
+            return api(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
         // Try to refresh the token
@@ -42,18 +82,23 @@ api.interceptors.response.use(
           { withCredentials: true }
         );
 
-        // Check if refresh was successful
         if (refreshResponse.status === 200) {
-          // Retry the original request
+          isRefreshing = false;
+          processQueue(null);
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh failed - clear auth state and redirect to login
-        // Only redirect if NOT already on login/register page
-        if (
-          !window.location.pathname.includes("/login") &&
-          !window.location.pathname.includes("/register")
-        ) {
+        // Refresh failed
+        isRefreshing = false;
+        processQueue(refreshError, null);
+
+        // Only show message and redirect if NOT on login/register page
+        const isPublicPage =
+          window.location.pathname === "/login" ||
+          window.location.pathname === "/register" ||
+          window.location.pathname === "/";
+
+        if (!isPublicPage) {
           // Clear auth storage
           localStorage.removeItem("auth-storage");
 
@@ -63,14 +108,15 @@ api.interceptors.response.use(
           // Redirect after a small delay
           setTimeout(() => {
             window.location.href = "/login";
-          }, 100);
+          }, 500);
         }
+
         return Promise.reject(refreshError);
       }
     }
 
-    // Don't show toast for 401 errors (handled above)
-    if (error.response?.status !== 401) {
+    // Don't show toast for 401 errors (handled above) or 404
+    if (error.response?.status !== 401 && error.response?.status !== 404) {
       const message = error.response?.data?.message || "Something went wrong";
       toast.error(message);
     }
