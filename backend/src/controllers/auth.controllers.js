@@ -68,7 +68,8 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 10 * 24 * 60 * 60 * 1000 // 10 days
   };
 
   const safeUser = await User.findById(user._id).select(
@@ -216,8 +217,10 @@ export const login = asyncHandler(async (req, res) => {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 10 * 24 * 60 * 60 * 1000 // 10 days
   };
+
 
   return res
     .status(200)
@@ -236,8 +239,8 @@ export const logout = asyncHandler(async (req, res) => {
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
-  }
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  };
 
   return res
     .status(200)
