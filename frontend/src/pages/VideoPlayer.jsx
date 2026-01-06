@@ -8,7 +8,6 @@ import CommentSection from "../components/comment/CommentSection";
 import { Eye, Calendar, Heart, List } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import toast from "react-hot-toast";
-import axios from "axios";
 import AddToPlaylistModal from "../components/playlist/AddToPlaylistModal";
 
 const VideoPlayer = () => {
@@ -117,24 +116,22 @@ const VideoPlayer = () => {
         return;
       }
 
-      const response = await axios.post(
-        `/api/v1/likes/toggle`,
-        {
-          targetType: "video",
-          targetId: videoId,
-        },
-        { withCredentials: true }
-      );
+      // ✅ Use likeAPI instead of raw axios
+      const response = await likeAPI.toggleLike("video", videoId);
 
       if (response.data.success) {
-        setIsLiked(response.data.data.isLiked);
-        setLikes(response.data.data.likeCount);
+        const liked = response.data.data?.isLiked ?? !isLiked;
+        const count =
+          response.data.data?.likeCount ?? (liked ? likes + 1 : likes - 1);
 
-        toast.success(response.data.data.isLiked ? "Liked! ❤️" : "Unliked");
+        setIsLiked(liked);
+        setLikes(count);
+
+        toast.success(liked ? "Liked! ❤️" : "Unliked");
       }
     } catch (error) {
       console.error("Like error:", error);
-      toast.error("Failed to update like");
+      toast.error(error.response?.data?.message || "Failed to update like");
     }
   };
 
